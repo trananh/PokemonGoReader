@@ -13,11 +13,12 @@ class Pokemon {
 		iv_percentage,
 		cp,
 		favorite,
-		candy,
 		family_name,
 		id,
 		move_1,
-		move_2
+		move_2,
+		caught_time,
+		level
 	)
 	{
 		this.pokedex_number = pokedex_number;
@@ -31,11 +32,12 @@ class Pokemon {
 		this.iv_percentage = iv_percentage;
 		this.cp = cp;
 		this.favorite = favorite;
-		this.candy = candy;
 		this.family_name = family_name;
 		this.id = id;
 		this.move_1 = move_1;
 		this.move_2 = move_2;
+		this.caught_time = caught_time;
+		this.level = level;
 	}
 }
 

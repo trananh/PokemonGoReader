@@ -1,5 +1,15 @@
-<section id="pokemon-stats-component" [hidden]="!_pokemonLoaded">
-	<h1>{{_title}}</h1>
-	<section>{{_content}}</section>
-	<pokemon-table></pokemon-table>
-</section>
+<div id="pokemon-stats-component" [hidden]="!_pokemonLoaded">
+	<section>
+		<section class="title">
+			<h1 id="title-heading">{{_title}}</h1>
+			<img id="refresh-img" src="webapp/img/refresh-icon.png" (click)="_refreshPokemon()">
+		</section>
+		<p>{{_content}}</p>
+	</section>
+	<form action="">
+		<input type="radio" [checked]="_displayByMonster" (click)="setDisplayType($event.target.checked)" name="displayType">Display by Monster<br>
+		<input type="radio" [checked]="!_displayByMonster" (click)="setDisplayType(!$event.target.checked)" name="displayType">Display by Species
+	</form>
+	<pokemon-table [hidden]="!_displayByMonster"></pokemon-table>
+	<pokemon-species [hidden]="_displayByMonster"></pokemon-species>
+</div>

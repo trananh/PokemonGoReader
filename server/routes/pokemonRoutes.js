@@ -2,11 +2,14 @@
 
 const bunyan = require('bunyan');
 const pogobuf = require('pogobuf');
+const Long = require('long');
 
 const props = require('../config/properties.js');
 const expressUtils = require('../utils/expressUtils.js');
+const pokemonUtils = require('../utils/pokemonUtils.js');
 
 const Pokemon = require('../models/Pokemon.js');
+const Species = require('../models/Species.js');
 
 const log = bunyan.createLogger({
 	name: props.log.names.pokemonRoutes,
@@ -52,33 +55,52 @@ module.exports = {
 
 							let splitInventory = pogobuf.Utils.splitInventory(inventory);
 
-							let rawCandies = splitInventory.candies;
-
 							let rawPokemon = splitInventory.pokemon;
 
 							let formattedPokemon = [];
 
+							let speciesMap = {};
+
 							for(let i = 0; i < rawPokemon.length; i++){
 								let pokemon = rawPokemon[i];
 
+								let caught_time = new Long(
+									pokemon.creation_time_ms.low,
+									pokemon.creation_time_ms.high,
+									pokemon.creation_time_ms.unsigned
+								);
+
 								if(pokemon.hasOwnProperty('is_egg') && !pokemon.is_egg){
-									let candy = 0;
-									for(let j = 0; j < rawCandies.length; j++){
-										let rawCandy = rawCandies[j];
+									let id = pokemon.pokemon_id.toString();
 
-										if(rawCandy.family_id.toString() === props.pokemonFamilyIdByPokedexNum[pokemon.pokemon_id.toString()]){
-											candy = rawCandy.candy;
-										}
-									}
+									let species = {
+										'pokedex_number': id,
+										'species': props.pokemonNamesByDexNum[pokemon.pokemon_id.toString()],
+										'count': 1,
+										'candy': 0,
+										'evolve_sort': 0,
+										'evolve': []
+									};
 
-									let name = props.pokemonNamesByDexNum[pokemon.pokemon_id.toString()];
-									if(pokemon.hasOwnProperty('nickname') && pokemon.nickname.length > 0){
-										name = pokemon.nickname;
+									if (id in speciesMap){
+										speciesMap[id].count += 1;
+									} else {
+										let candy = pokemonUtils.getCandy(pokemon, splitInventory.candies);
+										props.pokemonEvolutionByDexNum[id].forEach(function(descendant){
+											let canEvolve = Math.trunc((candy - 1) / (descendant.cost - 1));
+											if (canEvolve > 0){
+												species.evolve_sort = Math.max(species.evolve_sort, canEvolve);
+												species.evolve.push({'id': descendant.id, 'canEvolve': canEvolve});
+											}
+										});
+
+										species.candy = candy;
+										speciesMap[id] = species;
 									}
 
 									formattedPokemon.push(new Pokemon(
 										pokemon.pokemon_id,
-										name,
+										pokemonUtils.getName(pokemon),
 										props.pokemonNamesByDexNum[pokemon.pokemon_id.toString()],
 										pokemon.individual_attack,
 										pokemon.individual_defense,
@@ -88,16 +110,29 @@ module.exports = {
 										parseFloat(((pokemon.individual_attack + pokemon.individual_defense + pokemon.individual_stamina) / 45 * 100).toFixed(2)),
 										pokemon.cp,
 										pokemon.favorite === 1,
-										candy,
 										props.pokemonNamesByDexNum[props.pokemonFamilyIdByPokedexNum[pokemon.pokemon_id]],
 										pokemon.id,
 										pokemon.move_1,
-										pokemon.move_2
+										pokemon.move_2,
+										caught_time.toString(),
+										pokemonUtils.getLevel(pokemon)
 									));
 								}
 							}
 
-							expressUtils.sendResponse(res, next, 200, {pokemon: formattedPokemon}, req.body.username, endpoint);
+							let formattedSpecies = [];
+							Object.keys(speciesMap).forEach(function(speciesId) {
+								formattedSpecies.push(new Species(
+									speciesMap[speciesId].pokedex_number,
+									speciesMap[speciesId].species,
+									speciesMap[speciesId].count,
+									speciesMap[speciesId].candy,
+									speciesMap[speciesId].evolve_sort,
+									speciesMap[speciesId].evolve
+								));
+							});
+
+							expressUtils.sendResponse(res, next, 200, {pokemon: formattedPokemon, species: formattedSpecies}, req.body.username, endpoint);
 						}, err => {
 							log.error({err: err.message});
 							expressUtils.sendResponse(res, next, 500, {error: props.errors.inventory}, req.body.username, endpoint)
